@@ -90,20 +90,17 @@ keyword_matcher = on_message(rule=Rule(_keyword_rule), priority=10, block=False)
 async def handle_keyword(event: GroupMessageEvent):
     text = event.get_plaintext().strip()
     
-    # 冯氏指数优先检测
     feng = detect_feng(text)
     if feng != 0:
         async with cache_lock:
             report_cache[ReportCode.GROUP_KEYWORD].append(feng)
         return
     
-    # 正常上报
     if detect_normal(text):
         async with cache_lock:
-            report_cache[ReportCode.ERR_NET_LOST].append(-1)  # 正常信号用-1标记
+            report_cache[ReportCode.ERR_NET_LOST].append(-1)
         return
     
-    # 异常上报
     if detect_anomaly(text):
         async with cache_lock:
             report_cache[ReportCode.GROUP_KEYWORD].append(1)
@@ -215,13 +212,15 @@ async def send_aggregated_reports():
 
     for report_type, values in cached_items:
         if report_type == ReportCode.ERR_NET_LOST:
-            # 过滤掉正常信号标记 -1
-            actual_values = [v for v in values if v != -1]
-            if actual_values:
-                final_payload.append({"t": report_type, "v": sum(actual_values), "r": "BOT"})
+            anomaly_values = [v for v in values if v != -1]
+            normal_count = sum(1 for v in values if v == -1)
+            
+            if anomaly_values:
+                final_payload.append({"t": ReportCode.ERR_NET_LOST, "v": sum(anomaly_values), "r": "BOT"})
+            
+            if normal_count > 0:
+                final_payload.append({"t": 501, "v": normal_count, "r": "BOT"})
         elif report_type == ReportCode.GROUP_KEYWORD:
-            # 正数表示异常上报，负数暂时忽略或根据逻辑处理
-            # 这里的业务逻辑要求：正数上报
             anomaly_count = sum(1 for v in values if v > 0)
             if anomaly_count > 0:
                 final_payload.append({"t": report_type, "v": anomaly_count, "r": "BOT"})
@@ -240,24 +239,6 @@ async def send_aggregated_reports():
         await reporter.send_report(final_payload, config.maimai_bot_display_name)
     except Exception:
         pass
-
-
-def create_dynamic_alias_matcher(trigger_cmd: str, target_cmd_string: str):
-    dynamic_matcher = on_command(trigger_cmd, block=False, priority=5)
-
-    @dynamic_matcher.handle()
-    async def handle_dynamic_alias(bot: Bot, event: Event, args: Message = CommandArg()):
-        result_message = await trigger_report_by_command_string(
-            command_string=target_cmd_string,
-            bot=bot,
-            event=event
-        )
-        await dynamic_matcher.finish(f"命令联动触发 [{trigger_cmd}]: {result_message}")
-
-
-for trigger_cmd, target_cmd_string in config.maimai_command_aliases.items():
-    create_dynamic_alias_matcher(trigger_cmd, target_cmd_string)
-
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler
