@@ -3,22 +3,22 @@ from collections import defaultdict
 from nonebot import on_command, on_message, require, get_plugin_config
 from nonebot.rule import Rule
 from nonebot.matcher import Matcher
-from nonebot.exception import FinishedException
-from nonebot.adapters.onebot.v11 import Bot, Event, Message, MessageSegment
+from nonebot.adapters.onebot.v11 import Bot, Event, Message, GroupMessageEvent
 from nonebot.params import CommandArg
 from nonebot_plugin_localstore import get_plugin_data_dir
-import httpx
 import time
-import traceback
 from typing import Any
 from .config import Config
+from .constants import (
+    get_help_menu, REPORT_MAPPING, ReportCode, 
+    detect_anomaly, detect_normal, detect_feng
+)
 
 config = get_plugin_config(Config)
 data_dir = get_plugin_data_dir()
 cache_file = data_dir / "status.png"
 
 from .client import MaimaiReporter
-from .constants import get_help_menu, REPORT_MAPPING, ReportCode, OG_API_URL
 
 reporter = MaimaiReporter(
     client_id=config.maimai_bot_client_id,
@@ -39,54 +39,74 @@ async def _direct_alias_rule(event: Event) -> bool:
 
 net_direct_matcher = on_message(rule=Rule(_direct_alias_rule), priority=5, block=False)
 
-CACHE_TTL = 60
-
-
 @net_matcher.handle()
 @net_direct_matcher.handle()
 async def handle_net(matcher: Matcher):
-    if cache_file.exists():
-        if time.time() - cache_file.stat().st_mtime < CACHE_TTL:
-            try:
-                img_data = cache_file.read_bytes()
-                await matcher.send(MessageSegment.image(img_data))
-                await matcher.finish()
-            except FinishedException:
-                raise
-            except Exception:
-                cache_file.unlink(missing_ok=True)
+    data = await reporter.fetch_status()
+    if not data:
+        await matcher.finish(
+            "获取服务器状态失败，请稍后重试\n🔗 https://mai.chongxi.us"
+        )
+        return
+    
+    status = data.get("status", "empty")
+    status_map = {"normal": "✅ 好", "anomaly": "⚠️ 不稳定", "empty": "❌ 坏"}
+    status_label = status_map.get(status, "❓ 未知")
+    
+    latency = data.get("latency", {})
+    reports = data.get("reports", {})
+    logs = data.get("recent_logs", [])
+    broadcast = data.get("broadcast")
+    
+    msg = f"【舞萌DX游戏服务器状态】\n"
+    msg += f"游戏服务器 {status_label}\n"
+    msg += f"⏱ 当前延迟：{latency.get('current_ms', '--')}ms｜"
+    msg += f"负载：{latency.get('load_text', '--')}｜"
+    msg += f"延迟{latency.get('volatility_text', '--')}\n\n"
+    msg += f"💬 {data.get('summary', '')}\n"
+    
+    if logs:
+        for log in logs[:3]:
+            msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
+    
+    if broadcast and broadcast.get("msg"):
+        msg += f"\n📢 {broadcast['msg']}\n"
+    
+    msg += f"\n🔗 详情请查看 https://mai.chongxi.us/"
+    
+    await matcher.finish(msg)
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(OG_API_URL, timeout=30.0)
-            if response.status_code == 200:
-                try:
-                    data_dir.mkdir(parents=True, exist_ok=True)
-                    cache_file.write_bytes(response.content)
-                except Exception:
-                    pass
+async def _keyword_rule(event: Event) -> bool:
+    if not isinstance(event, GroupMessageEvent):
+        return False
+    text = event.get_plaintext().strip()
+    if not text:
+        return False
+    return bool(detect_anomaly(text) or detect_normal(text) or detect_feng(text))
 
-                try:
-                    await matcher.send(MessageSegment.image(response.content))
-                except Exception:
-                    try:
-                        await matcher.send(MessageSegment.image(OG_API_URL))
-                    except FinishedException:
-                        raise
-                    except Exception:
-                        pass
-                
-                await matcher.finish()
-            else:
-                await matcher.finish(f"获取状态图失败 (HTTP {response.status_code})\nURL: {OG_API_URL}\n请检查网络连接或 API 状态。")
-    except FinishedException:
-        raise
-    except Exception as e:
-        error_type = type(e).__name__
-        error_details = str(e)
-        tb = traceback.format_exc()
-        await matcher.finish(f"建议先到https://mai.chongxi.us/查看\n\n获取状态图时发生异常!\n类型: {error_type}\n原因: {error_details}\n\nDebug Info:\n{tb[:300]}...")
+keyword_matcher = on_message(rule=Rule(_keyword_rule), priority=10, block=False)
 
+@keyword_matcher.handle()
+async def handle_keyword(event: GroupMessageEvent):
+    text = event.get_plaintext().strip()
+    
+    # 冯氏指数优先检测
+    feng = detect_feng(text)
+    if feng != 0:
+        async with cache_lock:
+            report_cache[ReportCode.GROUP_KEYWORD].append(feng)
+        return
+    
+    # 正常上报
+    if detect_normal(text):
+        async with cache_lock:
+            report_cache[ReportCode.ERR_NET_LOST].append(-1)  # 正常信号用-1标记
+        return
+    
+    # 异常上报
+    if detect_anomaly(text):
+        async with cache_lock:
+            report_cache[ReportCode.GROUP_KEYWORD].append(1)
 
 @report_matcher.handle()
 async def handle_report(bot: Bot, event: Event, args: Message = CommandArg()):
@@ -179,7 +199,8 @@ async def trigger_report_by_command_string(
 
 COUNT_BASED_TYPES = {
     ReportCode.ERR_NET_LOST, ReportCode.ERR_LOGIN, ReportCode.ERR_MAI_NET,
-    ReportCode.ACC_INVOICE, ReportCode.ACC_BAN, ReportCode.ACC_SCAN
+    ReportCode.ACC_INVOICE, ReportCode.ACC_BAN, ReportCode.ACC_SCAN,
+    ReportCode.GROUP_KEYWORD
 }
 
 async def send_aggregated_reports():
@@ -193,7 +214,18 @@ async def send_aggregated_reports():
         report_cache.clear()
 
     for report_type, values in cached_items:
-        if report_type in COUNT_BASED_TYPES:
+        if report_type == ReportCode.ERR_NET_LOST:
+            # 过滤掉正常信号标记 -1
+            actual_values = [v for v in values if v != -1]
+            if actual_values:
+                final_payload.append({"t": report_type, "v": sum(actual_values), "r": "BOT"})
+        elif report_type == ReportCode.GROUP_KEYWORD:
+            # 正数表示异常上报，负数暂时忽略或根据逻辑处理
+            # 这里的业务逻辑要求：正数上报
+            anomaly_count = sum(1 for v in values if v > 0)
+            if anomaly_count > 0:
+                final_payload.append({"t": report_type, "v": anomaly_count, "r": "BOT"})
+        elif report_type in COUNT_BASED_TYPES:
             total_value = sum(values)
             if total_value > 0:
                 final_payload.append({"t": report_type, "v": total_value, "r": "BOT"})
@@ -206,7 +238,7 @@ async def send_aggregated_reports():
 
     try:
         await reporter.send_report(final_payload, config.maimai_bot_display_name)
-    except Exception as e:
+    except Exception:
         pass
 
 

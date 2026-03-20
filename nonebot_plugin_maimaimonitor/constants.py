@@ -1,4 +1,5 @@
 from enum import IntEnum
+import re
 
 class ReportCode(IntEnum):
     ERR_NET_LOST = 101
@@ -8,6 +9,7 @@ class ReportCode(IntEnum):
     ACC_BAN = 202
     ACC_SCAN = 203
     WAIT_TIME = 300
+    GROUP_KEYWORD = 801
 
 OG_API_URL = "https://mai.chongxi.us/api/og"
 
@@ -35,6 +37,86 @@ REPORT_MAPPING = {
     "罚站": (ReportCode.WAIT_TIME, "罚站时长"),
 }
 
+# 运营商主语
+OPERATOR_PATTERN = r'(?:华立|[Ss][Ee][Gg][Aa]|[Ss][Bb][Gg][Aa]|冯|老冯|服务器|机台|[Nn][Ee][Tt]|会员|标题|游戏)'
+
+# 异常动词
+ANOMALY_VERB_PATTERN = r'(?:炸|挂|死|坏|灰|飞|崩|寄|凉|废|完|烂|蹦|卡死|不行)'
+
+# 正常动词
+NORMAL_VERB_PATTERN = r'(?:好了|稳了|正常了|恢复了|回来了|活了|绿了|通了|好使了|没事了)'
+
+# 否定词（匹配位置前5字检测）
+NEGATIVE_WORDS = ['不', '没', '没有', '别', '未', '并未', '并没', '不会', '不是']
+
+# 不确定词（出现则不触发正常上报）
+UNCERTAIN_WORDS = ['好像', '可能', '应该', '感觉', '貌似']
+
+# 游戏专属异常词（单独触发，无需主语）
+STANDALONE_ANOMALY = ['灰网', '炸网', '小黑屋', '黑屋', '被发票', '扫号']
+
+# 游戏专属正常词（单独触发，无需主语）
+STANDALONE_NORMAL = ['绿网了', '服务器好了', '恢复正常']
+
+# 冯氏指数
+FENG_FLY_PATTERN = r'(?=.*(?:华立|[Ss][Ee][Gg][Aa]|[Ss][Bb][Gg][Aa]))(?=.*冯)(?=.*(?:飞|起飞))'
+FENG_RETURN_PATTERN = r'(?=.*(?:华立|[Ss][Ee][Gg][Aa]|[Ss][Bb][Gg][Aa]))(?=.*冯)(?=.*(?:返航|落地|稳了))'
+
+def detect_anomaly(text: str) -> bool:
+    """检测文本是否包含异常信号"""
+    # 检查否定词
+    def has_negation(pos: int) -> bool:
+        prefix = text[max(0, pos-5):pos]
+        return any(w in prefix for w in NEGATIVE_WORDS)
+    
+    # 游戏专属词单独触发
+    for word in STANDALONE_ANOMALY:
+        idx = text.find(word)
+        if idx != -1 and not has_negation(idx):
+            return True
+    
+    # 主语+动词组合
+    pattern = re.compile(
+        rf'{OPERATOR_PATTERN}.{{0,10}}{ANOMALY_VERB_PATTERN}',
+        re.IGNORECASE
+    )
+    for m in pattern.finditer(text):
+        if not has_negation(m.start()):
+            return True
+    
+    return False
+
+def detect_normal(text: str) -> bool:
+    """检测文本是否包含正常信号"""
+    # 不确定词过滤
+    if any(w in text for w in UNCERTAIN_WORDS):
+        return False
+    
+    # 游戏专属词单独触发
+    for word in STANDALONE_NORMAL:
+        if word in text:
+            return True
+    
+    # 主语+正面动词组合
+    pattern = re.compile(
+        rf'{OPERATOR_PATTERN}.{{0,10}}{NORMAL_VERB_PATTERN}',
+        re.IGNORECASE
+    )
+    return bool(pattern.search(text))
+
+def detect_feng(text: str) -> int:
+    """检测冯氏指数，返回 1=起飞 -1=返航 0=无"""
+    def has_negation_global(t: str) -> bool:
+        return any(w in t for w in NEGATIVE_WORDS)
+    
+    if has_negation_global(text):
+        return 0
+    if re.search(FENG_RETURN_PATTERN, text, re.IGNORECASE):
+        return -1
+    if re.search(FENG_FLY_PATTERN, text, re.IGNORECASE):
+        return 1
+    return 0
+
 def get_help_menu():
     menu = """查看使用方法:
 /report help 或 /上报 帮助
@@ -56,6 +138,6 @@ def get_help_menu():
 /report 罚站 120
 
 其他查询:
-/net : 查看服务器状态图
+/net : 查看服务器状态
 直接发送「网咋样」或「炸了吗」也可触发"""
     return menu
