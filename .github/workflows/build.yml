@@ -40,7 +40,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add pyproject.toml
-          git commit -m "chore: release ${{ steps.bump.outputs.V }}"
+          git commit -m "chore: release ${{ steps.bump.outputs.V }} [skip ci]"
           git push
 
       - name: Build and Upload

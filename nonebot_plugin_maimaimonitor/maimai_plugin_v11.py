@@ -1,30 +1,22 @@
 from asyncio import Lock
 from collections import defaultdict
-from nonebot import on_command, on_message, get_driver, require
+from nonebot import on_command, on_message, require, get_plugin_config
 from nonebot.rule import Rule
 from nonebot.matcher import Matcher
 from nonebot.exception import FinishedException
 from nonebot.adapters.onebot.v11 import Bot, Event, Message, MessageSegment
 from nonebot.params import CommandArg
+from nonebot_plugin_localstore import get_plugin_data_dir
 import httpx
 import time
-from pathlib import Path
-import asyncio
 import traceback
 from typing import Any
 from .config import Config
 
-driver = get_driver()
-global_config = driver.config
+config = get_plugin_config(Config)
+data_dir = get_plugin_data_dir()
+cache_file = data_dir / "status.png"
 
-config = Config(
-    maimai_bot_client_id=str(getattr(global_config, "maimai_bot_client_id", None)),
-    maimai_bot_private_key=getattr(global_config, "maimai_bot_private_key", None),
-    maimai_bot_display_name=getattr(global_config, "maimai_bot_display_name", None),
-    maimai_worker_url=getattr(global_config, "maimai_worker_url", "https://maiapi.chongxi.us"),
-    maimai_data_dir=getattr(global_config, "maimai_data_dir", None),
-    command_aliases=getattr(global_config, "command_aliases", {}),
-)
 from .client import MaimaiReporter
 from .constants import get_help_menu, REPORT_MAPPING, ReportCode, OG_API_URL
 
@@ -47,22 +39,12 @@ async def _direct_alias_rule(event: Event) -> bool:
 
 net_direct_matcher = on_message(rule=Rule(_direct_alias_rule), priority=5, block=False)
 
-def get_cache_paths():
-    if config.maimai_data_dir:
-        base_dir = Path(config.maimai_data_dir)
-    else:
-        base_dir = Path.cwd() / "data" / "maimai_monitor"
-    
-    return base_dir, base_dir / "status.png"
-
 CACHE_TTL = 60
 
 
 @net_matcher.handle()
 @net_direct_matcher.handle()
 async def handle_net(matcher: Matcher):
-    cache_dir, cache_file = get_cache_paths()
-
     if cache_file.exists():
         if time.time() - cache_file.stat().st_mtime < CACHE_TTL:
             try:
@@ -79,7 +61,7 @@ async def handle_net(matcher: Matcher):
             response = await client.get(OG_API_URL, timeout=30.0)
             if response.status_code == 200:
                 try:
-                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    data_dir.mkdir(parents=True, exist_ok=True)
                     cache_file.write_bytes(response.content)
                 except Exception:
                     pass
@@ -241,7 +223,7 @@ def create_dynamic_alias_matcher(trigger_cmd: str, target_cmd_string: str):
         await dynamic_matcher.finish(f"命令联动触发 [{trigger_cmd}]: {result_message}")
 
 
-for trigger_cmd, target_cmd_string in config.command_aliases.items():
+for trigger_cmd, target_cmd_string in config.maimai_command_aliases.items():
     create_dynamic_alias_matcher(trigger_cmd, target_cmd_string)
 
 
