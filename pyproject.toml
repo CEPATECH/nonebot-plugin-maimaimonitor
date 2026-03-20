@@ -13,8 +13,8 @@ requires = [ "setuptools>=61.0", "wheel",]
 build-backend = "setuptools.build_meta"
 
 [project.urls]
-Homepage = "https://github.com/ChongxiSama/nonebot-plugin-maimaimonitor"
-Repository = "https://github.com/ChongxiSama/nonebot-plugin-maimaimonitor"
+Homepage = "https://github.com/CEPATECH/nonebot-plugin-maimaimonitor"
+Repository = "https://github.com/CEPATECH/nonebot-plugin-maimaimonitor"
 
 [tool.nonebot]
 plugins = [ "nonebot_plugin_maimaimonitor",]
