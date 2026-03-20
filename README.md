@@ -32,7 +32,7 @@ pip install nonebot-plugin-maimaimonitor
 | `MAIMAI_BOT_DISPLAY_NAME` | `str` | `qwq` | Bot显示名称 |
 | `MAIMAI_WORKER_URL` | `str` | `https://maiapi.chongxi.us` | 上报API地址 |
 
-获取 ClientID 和私钥请联系：chongxi3555@proton.me
+获取 ClientID 和私钥请联系：qwq@chongxi.us
 
 ## 使用
 
