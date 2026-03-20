@@ -1,24 +1,21 @@
 # NoneBot Plugin: Maimai Monitor
 
-一个为 [NoneBot2](https://nonebot.dev/) 框架设计的插件，用于通过聊天指令上报 maimai 服务器状态
+一个为 [NoneBot2](https://nonebot.dev/) 框架设计的插件，用于监听群聊上报 maimai DX 服务器状态，并提供实时状态查询。
 
 ## 功能
 
-- [x] 状态上报: 通过简单的聊天指令（如 `/report 断网`）上报服务器状态
-- [x] 数据聚合: 自动缓存用户上报数据，每 30 秒打包发送至后端 API
-- [x] 自定义命令别名: 允许用户在配置中定义简洁的命令别名 映射到复杂的报告指令
-- [x] 直接抓取页面并渲染
+- **实时状态查询**：`/net` 或发送「网咋样」「炸了吗」，直接获取服务器当前状态
+- **手动上报**：通过 `/report` 命令上报故障类型
+- **自动监听**：在群聊中自动识别玩家自然语言，无需手动触发命令
+- **冯氏指数**：自动识别「华立老冯起飞/返航」等
 
-需要新的功能欢迎在issue提出
 ## 安装
-
-你可以通过 NoneBot 的脚手架工具 `nb-cli` 安装：
 
 ```bash
 nb plugin install nonebot-plugin-maimaimonitor
 ```
 
-或者通过 `pip` 安装：
+或通过 pip：
 
 ```bash
 pip install nonebot-plugin-maimaimonitor
@@ -26,95 +23,63 @@ pip install nonebot-plugin-maimaimonitor
 
 ## 配置
 
-插件的配置项通过 NoneBot 的统一配置方式进行管理，你需要在你的 NoneBot 项目根目录下的 `.env` 文件中设置
+在 `.env` 文件中配置：
 
-### 获取凭证
+| 环境变量 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `MAIMAI_BOT_CLIENT_ID` | `str` | 无 | ClientID（必填）|
+| `MAIMAI_BOT_PRIVATE_KEY` | `str` | 无 | 私钥（必填）|
+| `MAIMAI_BOT_DISPLAY_NAME` | `str` | `qwq` | Bot显示名称 |
+| `MAIMAI_WORKER_URL` | `str` | `https://maiapi.chongxi.us` | 上报API地址 |
 
-为了向后端 API 发送数据，你需要一个 `ClientID` 和 `PRIVATE_KEY`。请联系 email:qwq@chongxi.us 获取。`ClientID`由您提供，建议为数字（这个不是机台狗号）
-
-获取服务器页面则不要求bot私钥校验
-
-**请妥善保管你的 `PRIVATE_KEY`，不要泄露给任何人。**
-
-### 环境变量
-
-| 环境变量              | 类型   | 默认值                  | 说明                                   |
-| :-------------------- | :----- | :---------------------- | :------------------------------------- |
-| `MAIMAI_BOT_CLIENT_ID` | `str`  | 无                      | ClientID (必要)             |
-| `MAIMAI_BOT_PRIVATE_KEY` | `str`  | 无                      | 私钥 (必要)                  |
-| `MAIMAI_BOT_DISPLAY_NAME` | `str`  | `qwq`                   | 您bot的名称           |
-| `MAIMAI_WORKER_URL`   | `str`  | `https://maiapi.chongxi.us` | 上报数据后端的 API 地址  |
-| `COMMAND_ALIASES`     | `Dict[str, str]` | `{}` | 自定义命令别名，用于将简洁命令映射到报告指令 |
-
-### `.env` 配置文件示例
-
-```dotenv
-# .env 文件 (位于你的 NoneBot 项目根目录)
-
-# --- NoneBot Plugin Maimai Monitor 插件核心配置 ---
-MAIMAI_BOT_CLIENT_ID="YOUR_BOT_CLIENT_ID"
-MAIMAI_BOT_PRIVATE_KEY="YOUR_BOT_PRIVATE_KEY"
-MAIMAI_BOT_DISPLAY_NAME="qwqbot"
-MAIMAI_WORKER_URL="https://maiapi.chongxi.us"
-
-# --- 自定义命令别名配置 (使用单行 JSON 字符串) ---
-# 左边是用户输入的新命令，右边是它映射的内部报告指令参数字符串。
-# 右边的字符串会被插件解析，并作为 /report 命令的参数部分。
-COMMAND_ALIASES="{ \
-    \"ctk\": \"被发票\", \
-    \"清票\": \"被发票\", \
-    \"服务器炸了\": \"断网\", \
-    \"打不开公众号\": \"NET打不开\", \
-    \"变游客了\": \"无法登录\", \
-    \"黑屋了\": \"小黑屋\", \
-    \"被发舞神了\": \"其他扫号行为\", \
-    \"罚站300秒\": \"罚站 300\", \
-    \"罚站一小时\": \"罚站 3600\", \
-    \"帮助\": \"help\" \
-}"
-```
+获取 ClientID 和私钥请联系：chongxi3555@proton.me
 
 ## 使用
 
-在你的 NoneBot 项目 `bot.py` 文件中加载插件：
+### 查看服务器状态
+发送 `/net`、`网咋样` 或 `炸了吗`
 
-```python
-# bot.py
-import nonebot
+```
+【舞萌DX游戏服务器状态】
+游戏服务器 ✅ 好
+⏱ 当前延迟：396ms｜负载：正常｜延迟高波动
 
-# ... 其他初始化代码 ...
+💬 服务器运行正常
+• 1小时前 中国 机台断网
+• 4小时前 JP 机台无法登录
 
-nonebot.load_plugin("nonebot_plugin_maimaimonitor")
-
-# ... nonebot.run() ...
+🔗 详情请查看 https://mai.chongxi.us/
 ```
 
-插件加载成功后，你可以在与机器人聊天的任何地方发送以下指令：
+### 手动上报
+```
+/report 断网
+/report 小黑屋
+/report 被发票
+/report 罚站 300
+/report help
+```
 
-*   `/report help` 或 `/上报 帮助`: 查看全部可用的上报类型和帮助信息
-*   **使用自定义命令别名**: 例如，如果你在 `COMMAND_ALIASES` 中配置了 `"ctk": "被发票"`，那么直接发送 `ctk` 即可触发 `/report 被发票` 的功能
+### 自动监听（群聊）
+插件会自动识别群聊中的以下说法并上报，无需手动触发：
 
-**部分命令示例**:
-*   `/report 断网` 或 配置的别名（如 `炸了`）: 上报一次机台网络断开事件
-*   `/report 罚站 [秒数]` 或 配置的别名（如 `罚站五分钟`）: 上报玩家罚站时长，例如 `/report 罚站 300` 表示罚站 5 分钟
-*   `/net` 查看服务器状态 Dashboard
+- 主语：华立、SEGA、服务器、机台、NET 等
+- 动词：炸、挂、死、坏、崩 等
+- 示例：「服务器又炸了」「SEGA挂了」「机台灰网」
 
-## 主动 Dashboard 渲染
+- 示例：「服务器好了」「华立稳了」「绿网了」
 
-~~未来将会支持直接将前端渲染为SVG并转化为图片~~
+**冯氏指数**
+- 起飞（异常）：「华立冯飞了」「SEGA老冯起飞」
+- 返航（正常）：「华立冯返航了」「SEGA老冯落地」
 
-现提供两种方式获取本站页面可视化，获取 Dashboard 信息不要求密钥校验，在Telegram等支持预览图的软件中，发送`https://mai.chongxi.us/`也可以直接产出服务器状态的预览图片
+## 关于
 
-1. 已集成`/net`命令，使用该命令直接获取由SVG绘制的图片，轻量快速，缺点是查看效果不如原GUI ~~咱的绘图功底也就这样了~~
-
-`dark`参数有效，不设置默认auto
-
-效果等同于 `curl -o status.png "https://mai.chongxi.us/api/og" `
-
-2. 直接截取，您可以使用无头浏览器直接截`https://mai.chongxi.us/?share=true&dark=auto`
-
-`share` 为 bot 特殊优化的页面，`dark` 用于切换深色模式，`auto` 会自动根据时间切换。
+数据由 [mai.chongxi.us](https://mai.chongxi.us) 提供，基于玩家上报 + 机台探针 + 服务器探针三方聚合。
 
 ## 贡献
 
 欢迎提交 PR。
+
+## 注
+由于本人同时维护服务器监测的前端/后端/探针以及bot服务，可能有不及时更新的情况，望谅解
