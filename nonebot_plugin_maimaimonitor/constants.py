@@ -11,8 +11,6 @@ class ReportCode(IntEnum):
     WAIT_TIME = 300
     GROUP_KEYWORD = 801
 
-OG_API_URL = "https://mai.chongxi.us/api/og"
-
 REPORT_MAPPING = {
     "1": (ReportCode.ERR_NET_LOST, "断网"),
     "断网": (ReportCode.ERR_NET_LOST, "断网"),

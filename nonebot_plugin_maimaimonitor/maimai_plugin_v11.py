@@ -5,7 +5,6 @@ from nonebot.rule import Rule
 from nonebot.matcher import Matcher
 from nonebot.adapters.onebot.v11 import Bot, Event, Message, GroupMessageEvent
 from nonebot.params import CommandArg
-from nonebot_plugin_localstore import get_plugin_data_dir
 import time
 from typing import Any
 from .config import Config
@@ -15,8 +14,6 @@ from .constants import (
 )
 
 config = get_plugin_config(Config)
-data_dir = get_plugin_data_dir()
-cache_file = data_dir / "status.png"
 
 from .client import MaimaiReporter
 
@@ -54,7 +51,6 @@ async def handle_net(matcher: Matcher):
     status_label = status_map.get(status, "❓ 未知")
     
     latency = data.get("latency", {})
-    reports = data.get("reports", {})
     logs = data.get("recent_logs", [])
     broadcast = data.get("broadcast")
     
@@ -159,45 +155,9 @@ async def process_maimai_report(
     return f"{report_name}上报成功"
 
 
-async def trigger_report_by_command_string(
-    command_string: str,
-    bot: Bot,
-    event: Event
-) -> str:
-    arg_text = command_string.lstrip('/').lstrip("report").strip()
-    arg_parts = arg_text.split()
-
-    if not arg_text or len(arg_parts) == 0:
-        return f"指令格式错误。\n{get_help_menu()}"
-
-    report_key = arg_parts[0].lower()
-    if report_key not in REPORT_MAPPING:
-        return f"未知的报告类型: '{report_key}'\n请使用 /report help 查看可用类型。"
-
-    report_code, report_name = REPORT_MAPPING[report_key]
-    report_value = 1
-
-    if report_code == ReportCode.WAIT_TIME:
-        if len(arg_parts) > 1:
-            try:
-                report_value = int(arg_parts[1])
-            except ValueError:
-                return "罚站时长参数必须是数字（秒数）。"
-        else:
-            return "请输入罚站时长（秒）。\n用法: /report 罚站 [秒数]"
-
-    return await process_maimai_report(
-        report_code=report_code,
-        report_name=report_name,
-        report_value=report_value,
-        bot=bot,
-        event=event
-    )
-
 COUNT_BASED_TYPES = {
     ReportCode.ERR_NET_LOST, ReportCode.ERR_LOGIN, ReportCode.ERR_MAI_NET,
-    ReportCode.ACC_INVOICE, ReportCode.ACC_BAN, ReportCode.ACC_SCAN,
-    ReportCode.GROUP_KEYWORD
+    ReportCode.ACC_INVOICE, ReportCode.ACC_BAN, ReportCode.ACC_SCAN
 }
 
 async def send_aggregated_reports():
@@ -222,8 +182,14 @@ async def send_aggregated_reports():
                 final_payload.append({"t": 501, "v": normal_count, "r": "BOT"})
         elif report_type == ReportCode.GROUP_KEYWORD:
             anomaly_count = sum(1 for v in values if v > 0)
+            return_count = sum(1 for v in values if v < 0)
+            
             if anomaly_count > 0:
-                final_payload.append({"t": report_type, "v": anomaly_count, "r": "BOT"})
+                final_payload.append({"t": int(report_type), "v": anomaly_count, "r": "BOT"})
+            
+            if return_count > 0:
+                # 返航信号上报正常类型 t:501
+                final_payload.append({"t": 501, "v": return_count, "r": "BOT"})
         elif report_type in COUNT_BASED_TYPES:
             total_value = sum(values)
             if total_value > 0:
