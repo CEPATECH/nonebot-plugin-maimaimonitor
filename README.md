@@ -79,7 +79,7 @@ pip install nonebot-plugin-maimaimonitor
 
 ## 开发计划
 
-- [ ] Auth v2：新密钥体系，支持 `v2_` 前缀 Client ID，兼容现有 v1 用户
+- [x] Auth v2：新密钥体系，支持 `v2_` 前缀 Client ID，兼容现有 v1 用户
 - [ ] 主动断网通知：检测到异常激增时，bot 自动推送告警到所在群
 
 ## 贡献
