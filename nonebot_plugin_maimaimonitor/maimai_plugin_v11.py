@@ -15,6 +15,9 @@ from .constants import (
 
 config = get_plugin_config(Config)
 
+keyword_cooldown: dict[int, float] = {}
+KEYWORD_COOLDOWN_SECONDS = 60
+
 from .client import MaimaiReporter
 
 reporter = MaimaiReporter(
@@ -84,6 +87,13 @@ keyword_matcher = on_message(rule=Rule(_keyword_rule), priority=10, block=False)
 
 @keyword_matcher.handle()
 async def handle_keyword(event: GroupMessageEvent):
+    user_id = event.user_id
+    now = time.time()
+    if user_id in keyword_cooldown:
+        if now - keyword_cooldown[user_id] < KEYWORD_COOLDOWN_SECONDS:
+            return
+    keyword_cooldown[user_id] = now
+    
     text = event.get_plaintext().strip()
     
     feng = detect_feng(text)
@@ -181,14 +191,13 @@ async def send_aggregated_reports():
             if normal_count > 0:
                 final_payload.append({"t": 501, "v": normal_count, "r": "BOT"})
         elif report_type == ReportCode.GROUP_KEYWORD:
-            anomaly_count = sum(1 for v in values if v > 0)
-            return_count = sum(1 for v in values if v < 0)
+            anomaly_count = min(sum(1 for v in values if v > 0), 5)
+            return_count = min(sum(1 for v in values if v < 0), 5)
             
             if anomaly_count > 0:
-                final_payload.append({"t": int(report_type), "v": anomaly_count, "r": "BOT"})
+                final_payload.append({"t": 101, "v": anomaly_count, "r": "BOT"})
             
             if return_count > 0:
-                # 返航信号上报正常类型 t:501
                 final_payload.append({"t": 501, "v": return_count, "r": "BOT"})
         elif report_type in COUNT_BASED_TYPES:
             total_value = sum(values)
