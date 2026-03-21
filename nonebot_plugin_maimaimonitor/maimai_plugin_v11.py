@@ -54,15 +54,26 @@ async def handle_net(matcher: Matcher):
     status_label = status_map.get(status, "❓ 未知")
     
     latency = data.get("latency", {})
+    reports = data.get("reports", {})
     logs = data.get("recent_logs", [])
     broadcast = data.get("broadcast")
     
     msg = f"【舞萌DX游戏服务器状态】\n"
     msg += f"游戏服务器 {status_label}\n"
     msg += f"⏱ 当前延迟：{latency.get('current_ms', '--')}ms｜"
-    msg += f"负载：{latency.get('load_text', '--')}｜"
+    msg += f"服务器负载：{latency.get('load_text', '--')}｜"
     msg += f"延迟{latency.get('volatility_text', '--')}\n\n"
-    msg += f"💬 {data.get('summary', '')}\n"
+
+    anomaly = reports.get('anomaly_count', 0)
+    normal = reports.get('normal_count', 0)
+    if anomaly == 0 and normal == 0:
+        msg += f"💬 过去1小时内无任何上报\n"
+    elif normal == 0:
+        msg += f"💬 过去1小时有{anomaly}条异常上报，无正常上报\n"
+    elif anomaly == 0:
+        msg += f"💬 过去1小时有{normal}条正常上报，无异常\n"
+    else:
+        msg += f"💬 过去1小时有{anomaly}条异常，{normal}条正常上报\n"
     
     if logs:
         for log in logs[:3]:
