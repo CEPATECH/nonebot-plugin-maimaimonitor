@@ -11,7 +11,7 @@ from typing import Any
 from .config import Config
 from .constants import (
     get_help_menu, REPORT_MAPPING, ReportCode, 
-    detect_anomaly, detect_normal, detect_feng
+    detect_anomaly, detect_normal, detect_feng, detect_ban
 )
 
 config = get_plugin_config(Config)
@@ -169,7 +169,7 @@ async def _keyword_rule(event: Event) -> bool:
     text = event.get_plaintext().strip()
     if not text:
         return False
-    return bool(detect_anomaly(text) or detect_normal(text) or detect_feng(text))
+    return bool(detect_anomaly(text) or detect_normal(text) or detect_feng(text) or detect_ban(text))
 
 keyword_matcher = on_message(rule=Rule(_keyword_rule), priority=10, block=False)
 
@@ -191,6 +191,12 @@ async def handle_keyword(event: GroupMessageEvent):
             report_cache[ReportCode.GROUP_KEYWORD].append(feng)
         return
     
+    if detect_ban(text):
+        async with cache_lock:
+            report_cache[ReportCode.GROUP_KEYWORD_BAN].append(1)
+        logger.info(f"关键词触发小黑屋上报 | 文本：{text} | 用户：{event.user_id} | 群：{event.group_id}")
+        return
+
     if detect_normal(text):
         logger.info(f"关键词触发正常上报 | 文本：{text} | 用户：{event.user_id} | 群：{event.group_id}")
         async with cache_lock:
@@ -290,6 +296,10 @@ async def send_aggregated_reports():
             
             if return_count > 0:
                 final_payload.append({"t": 501, "v": return_count, "r": "BOT"})
+        elif report_type == ReportCode.GROUP_KEYWORD_BAN:
+            ban_count = min(sum(1 for v in values if v > 0), 5)
+            if ban_count > 0:
+                final_payload.append({"t": 202, "v": ban_count, "r": "BOT"})
         elif report_type in COUNT_BASED_TYPES:
             total_value = sum(values)
             if total_value > 0:
