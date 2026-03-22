@@ -45,7 +45,7 @@ NEGATIVE_WORDS = ['不', '没', '没有', '别', '未', '并未', '并没', '不
 
 UNCERTAIN_WORDS = ['好像', '可能', '应该', '感觉', '貌似']
 
-STANDALONE_ANOMALY = ['灰网', '炸网', '小黑屋', '黑屋了', '黑屋', '进黑屋', '被关小黑屋', '关小黑屋', '被发票', '发票了', '扫号']
+STANDALONE_ANOMALY = ['灰网', '炸网', '小黑屋', '黑屋了', '黑屋', '进黑屋', '被关小黑屋', '关小黑屋', '被发票', '发票了', '扫号', '游客了', '变游客', '游客模式', '掉游客', '游客登录']
 
 STANDALONE_NORMAL = ['绿网了', '服务器好了', '恢复正常']
 
@@ -62,6 +62,9 @@ def detect_anomaly(text: str) -> bool:
         if idx != -1 and not has_negation(idx):
             return True
     
+    if re.search(r'\d+\s*(min|分钟)了', text, re.IGNORECASE):
+        return True
+
     pattern = re.compile(
         rf'{OPERATOR_PATTERN}.{{0,10}}{ANOMALY_VERB_PATTERN}',
         re.IGNORECASE

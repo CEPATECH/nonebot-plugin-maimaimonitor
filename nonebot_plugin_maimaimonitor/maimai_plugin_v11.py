@@ -1,6 +1,7 @@
 from asyncio import Lock
 from collections import defaultdict
 from nonebot import on_command, on_message, require, get_plugin_config
+from nonebot.log import logger
 from nonebot.rule import Rule
 from nonebot.matcher import Matcher
 from nonebot.adapters.onebot.v11 import Bot, Event, Message, GroupMessageEvent
@@ -17,6 +18,9 @@ config = get_plugin_config(Config)
 
 keyword_cooldown: dict[int, float] = {}
 KEYWORD_COOLDOWN_SECONDS = 60
+
+last_status: str = "normal"
+anomaly_start_time: float | None = None
 
 from .client import MaimaiReporter
 
@@ -86,6 +90,70 @@ async def handle_net(matcher: Matcher):
     
     await matcher.finish(msg)
 
+def format_duration(seconds: int) -> str:
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    if hours > 0:
+        return f"{hours}hr {minutes}min"
+    return f"{minutes}min"
+
+async def broadcast_to_groups(msg: str):
+    if not config.maimai_broadcast_group_ids:
+        return
+    try:
+        from nonebot import get_bot
+        bot = get_bot()
+        for group_id in config.maimai_broadcast_group_ids:
+            try:
+                await bot.send_group_msg(group_id=group_id, message=msg)
+                logger.info(f"播报成功 group_id={group_id}")
+            except Exception as e:
+                logger.warning(f"播报失败 group_id={group_id}: {e}")
+    except Exception as e:
+        logger.warning(f"获取bot实例失败: {e}")
+
+async def check_server_status():
+    global last_status, anomaly_start_time
+    if not config.maimai_broadcast_group_ids:
+        return
+    try:
+        data = await reporter.fetch_status()
+        if not data:
+            return
+        status = data.get("status", "normal")
+        now = time.time()
+
+        if last_status == "normal" and status in ("anomaly", "empty"):
+            anomaly_start_time = now
+            last_status = status
+            summary = data.get("summary", "")
+            logs = data.get("recent_logs", [])
+            msg = "【舞萌DX服务器断网播报】\n"
+            msg += "游戏服务器 ❌ 坏\n\n"
+            msg += f"💬 {summary}\n"
+            for log in logs[:3]:
+                msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
+            msg += "\n🔗 详情请查看 https://mai.chongxi.us/"
+            logger.info(f"检测到服务器异常，开始播报")
+            await broadcast_to_groups(msg)
+
+        elif last_status in ("anomaly", "empty") and status == "normal":
+            duration = int(now - anomaly_start_time) if anomaly_start_time else 0
+            last_status = "normal"
+            anomaly_start_time = None
+            msg = "【舞萌DX服务器状态恢复】\n"
+            msg += "游戏服务器 ✅ 好\n"
+            msg += f"本次约持续 {format_duration(duration)}\n\n"
+            msg += "🔗 详情请查看 https://mai.chongxi.us/"
+            logger.info(f"服务器恢复正常，播报恢复通知")
+            await broadcast_to_groups(msg)
+
+        else:
+            last_status = status
+
+    except Exception as e:
+        logger.warning(f"状态检测失败: {e}")
+
 async def _keyword_rule(event: Event) -> bool:
     if not isinstance(event, GroupMessageEvent):
         return False
@@ -109,16 +177,19 @@ async def handle_keyword(event: GroupMessageEvent):
     
     feng = detect_feng(text)
     if feng != 0:
+        logger.info(f"关键词触发冯氏指数 direction={feng} | 文本：{text} | 用户：{event.user_id} | 群：{event.group_id}")
         async with cache_lock:
             report_cache[ReportCode.GROUP_KEYWORD].append(feng)
         return
     
     if detect_normal(text):
+        logger.info(f"关键词触发正常上报 | 文本：{text} | 用户：{event.user_id} | 群：{event.group_id}")
         async with cache_lock:
             report_cache[ReportCode.ERR_NET_LOST].append(-1)
         return
     
     if detect_anomaly(text):
+        logger.info(f"关键词触发异常上报 | 文本：{text} | 用户：{event.user_id} | 群：{event.group_id}")
         async with cache_lock:
             report_cache[ReportCode.GROUP_KEYWORD].append(1)
 
@@ -230,3 +301,4 @@ require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler
 
 scheduler.add_job(send_aggregated_reports, "interval", seconds=30, id="maimai_report_scheduler_v11")
+scheduler.add_job(check_server_status, "interval", seconds=config.maimai_broadcast_interval, id="maimai_broadcast_checker")
