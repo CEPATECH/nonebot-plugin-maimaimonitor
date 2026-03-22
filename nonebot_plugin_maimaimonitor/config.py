@@ -8,3 +8,4 @@ class Config(BaseModel):
     maimai_worker_url: str = "https://maiapi.chongxi.us"
     maimai_broadcast_group_ids: list[int] = []
     maimai_broadcast_interval: int = 300
+    maimai_broadcast_all_groups: bool = False

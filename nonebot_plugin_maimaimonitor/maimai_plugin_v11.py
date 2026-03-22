@@ -98,23 +98,32 @@ def format_duration(seconds: int) -> str:
     return f"{minutes}min"
 
 async def broadcast_to_groups(msg: str):
-    if not config.maimai_broadcast_group_ids:
-        return
     try:
         from nonebot import get_bot
         bot = get_bot()
-        for group_id in config.maimai_broadcast_group_ids:
-            try:
-                await bot.send_group_msg(group_id=group_id, message=msg)
-                logger.info(f"播报成功 group_id={group_id}")
-            except Exception as e:
-                logger.warning(f"播报失败 group_id={group_id}: {e}")
+        if config.maimai_broadcast_all_groups:
+            group_list = await bot.get_group_list()
+            for group in group_list:
+                try:
+                    await bot.send_group_msg(group_id=group['group_id'], message=msg)
+                    logger.info(f"播报成功 group_id={group['group_id']}")
+                except Exception as e:
+                    logger.warning(f"播报失败 group_id={group['group_id']}: {e}")
+        elif config.maimai_broadcast_group_ids:
+            for group_id in config.maimai_broadcast_group_ids:
+                try:
+                    await bot.send_group_msg(group_id=group_id, message=msg)
+                    logger.info(f"播报成功 group_id={group_id}")
+                except Exception as e:
+                    logger.warning(f"播报失败 group_id={group_id}: {e}")
+        else:
+            return
     except Exception as e:
         logger.warning(f"获取bot实例失败: {e}")
 
 async def check_server_status():
     global last_status, anomaly_start_time
-    if not config.maimai_broadcast_group_ids:
+    if not config.maimai_broadcast_group_ids and not config.maimai_broadcast_all_groups:
         return
     try:
         data = await reporter.fetch_status()

@@ -33,8 +33,9 @@ pip install nonebot-plugin-maimaimonitor
 | `MAIMAI_BOT_PRIVATE_KEY` | `str` | 无 | 与 ClientID 配套的私钥，申请时一并提供 |
 | `MAIMAI_BOT_DISPLAY_NAME` | `str` | `qwq` | Bot显示名称，上报时展示 |
 | `MAIMAI_WORKER_URL` | `str` | `https://maiapi.chongxi.us` | 上报API地址 |
-| `MAIMAI_BROADCAST_GROUP_IDS` | `list[int]` | `[]` | 断网播报群号列表 |
-| `MAIMAI_BROADCAST_INTERVAL` | `int` | `300` | 状态检测间隔（秒）|
+| `MAIMAI_BROADCAST_GROUP_IDS` | `list[int]` | `[]` | 广播推送的群组列表 |
+| `MAIMAI_BROADCAST_INTERVAL` | `int` | `300` | 广播轮询检测间隔（秒） |
+| `MAIMAI_BROADCAST_ALL_GROUPS` | `bool` | `false` | 向bot所在所有群播报，谨慎使用，不建议在非舞萌群中开启 |
 
 **Client ID由您提供，任意ASCII字符，联系qwq@chongxi.us或chongxi3555@proton.me**
 
