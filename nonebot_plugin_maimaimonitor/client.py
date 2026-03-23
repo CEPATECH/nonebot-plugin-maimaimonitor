@@ -1,3 +1,11 @@
+# ============================================================
+# WARNING: DO NOT MODIFY THIS FILE
+# client.py 包含核心签名算法
+# 任何改动都会导致已有用户密钥失效，与服务端验证不兼容
+# 如需扩展功能请只添加新方法
+# 不要修改 _calculate_hmac_sha256 / _generate_sha256_hash / send_report
+# ============================================================
+
 import hmac
 import hashlib
 import time
