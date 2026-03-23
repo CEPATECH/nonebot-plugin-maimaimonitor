@@ -126,6 +126,11 @@ pip install nonebot-plugin-maimaimonitor
 
 数据由 [isMaiDown](https://mai.chongxi.us) 提供
 
+
+> [!CAUTION]
+> `client.py` 包含核心签名算法，任何改动都可能导致与服务端验证不兼容。如需扩展功能请只添加新方法，不要修改 `_calculate_hmac_sha256`、`_generate_sha256_hash`、`send_report` 的任何逻辑。
+
+
 ## 开发计划
 
 - [x] Auth v2：新密钥体系，支持 `v2_` 前缀 Client ID，兼容现有 v1 用户
