@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-maimaimonitor"
-version = "26.1.13"
+version = "26.1.14"
 description = "A NoneBot2 plugin to report maimai server status."
 license = "MIT"
 requires-python = ">=3.8"
