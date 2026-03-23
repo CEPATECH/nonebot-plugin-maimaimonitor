@@ -11,6 +11,7 @@ class ReportCode(IntEnum):
     WAIT_TIME = 300
     GROUP_KEYWORD = 801
     GROUP_KEYWORD_BAN = 802
+    GROUP_KEYWORD_GUEST = 803
 
 REPORT_MAPPING = {
     "1": (ReportCode.ERR_NET_LOST, "断网"),
@@ -46,7 +47,9 @@ NEGATIVE_WORDS = ['不', '没', '没有', '别', '未', '并未', '并没', '不
 
 UNCERTAIN_WORDS = ['好像', '可能', '应该', '感觉', '貌似']
 
-STANDALONE_BAN = ['小黑屋', '黑屋了', '黑屋', '进黑屋', '被关小黑屋', '关小黑屋', '游客了', '变游客', '游客模式', '掉游客', '游客登录']
+STANDALONE_BAN = ['小黑屋', '黑屋了', '黑屋', '进黑屋', '被关小黑屋', '关小黑屋']
+
+STANDALONE_GUEST = ['游客了', '变游客', '游客模式', '掉游客', '游客登录']
 
 STANDALONE_ANOMALY = ['灰网', '炸网', '被发票', '发票了', '扫号']
 
@@ -67,6 +70,18 @@ def detect_ban(text: str) -> bool:
     
     if re.search(r'\d+\s*(min|分钟)了', text, re.IGNORECASE):
         return True
+    
+    return False
+
+def detect_guest(text: str) -> bool:
+    def has_negation(pos: int) -> bool:
+        prefix = text[max(0, pos-5):pos]
+        return any(w in prefix for w in NEGATIVE_WORDS)
+    
+    for word in STANDALONE_GUEST:
+        idx = text.find(word)
+        if idx != -1 and not has_negation(idx):
+            return True
     
     return False
 
