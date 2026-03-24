@@ -140,6 +140,9 @@ pip install nonebot-plugin-maimaimonitor
 
 欢迎提交 PR。
 
+## 特别鸣谢
+感谢 [@Jackdwh](https://github.com/Jackdwh) 对此项目调试做出的巨大贡献
+
 ## 注
 
 本人同时维护前端/后端/探针及bot服务，更新可能有延迟，望谅解。
