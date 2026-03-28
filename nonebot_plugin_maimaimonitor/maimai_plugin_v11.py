@@ -169,6 +169,9 @@ async def _keyword_rule(event: Event) -> bool:
     text = event.get_plaintext().strip()
     if not text:
         return False
+    # 过滤bot自己的回复消息
+    if '【舞萌DX' in text:
+        return False
     return bool(detect_anomaly(text) or detect_normal(text) or detect_feng(text) or detect_ban(text) or detect_guest(text))
 
 keyword_matcher = on_message(rule=Rule(_keyword_rule), priority=10, block=False)
