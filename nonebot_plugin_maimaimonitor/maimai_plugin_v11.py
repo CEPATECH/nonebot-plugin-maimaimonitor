@@ -273,7 +273,7 @@ async def process_maimai_report(
 
 COUNT_BASED_TYPES = {
     ReportCode.ERR_NET_LOST, ReportCode.ERR_LOGIN, ReportCode.ERR_MAI_NET,
-    ReportCode.ACC_INVOICE, ReportCode.ACC_BAN, ReportCode.ACC_SCAN
+    ReportCode.ERR_QR, ReportCode.ERR_SCORE, ReportCode.ACC_BAN
 }
 
 async def send_aggregated_reports():
