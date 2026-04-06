@@ -126,6 +126,19 @@ pip install nonebot-plugin-maimaimonitor
 
 数据由 [isMaiDown](https://mai.chongxi.us) 提供
 
+## 通用 API 文档
+
+<div align="center">
+  <img src="https://img.shields.io/badge/nextra-000000?style=for-the-badge&logo=nextra&logoColor=white" />
+    <img src="https://img.shields.io/badge/vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" />
+
+</div>
+
+<br>
+
+完整接口说明及在线调试工具请访问 [isMaiDown API Docs](https://maidoc.chongxi.us)
+
+---
 
 > [!CAUTION]
 > `client.py` 包含核心签名算法，任何改动都可能导致与服务端验证不兼容。如需扩展功能请只添加新方法，不要修改 `_calculate_hmac_sha256`、`_generate_sha256_hash`、`send_report` 的任何逻辑。
