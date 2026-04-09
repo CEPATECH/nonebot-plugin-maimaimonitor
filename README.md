@@ -52,7 +52,7 @@ pip install nonebot-plugin-maimaimonitor
 
 ## 使用
 
-### 查看服务器状态
+### 查看服务器状态 (无需私钥即可查询)
 发送 `/net`、`网咋样` 或 `炸了吗`
 
 ```
@@ -67,7 +67,7 @@ pip install nonebot-plugin-maimaimonitor
 🔗 详情请查看 https://mai.chongxi.us/
 ```
 
-### 手动上报
+### 手动上报 (需要Client ID+私钥才可上报)
 ```
 /report 断网
 /report 小黑屋
@@ -76,7 +76,7 @@ pip install nonebot-plugin-maimaimonitor
 /report help
 ```
 
-### 自动监听（群聊）
+#### 自动监听（群聊）
 插件会自动识别群聊中的以下说法并上报，无需手动触发：
 
 **异常触发**（主语+动词组合）
@@ -91,7 +91,7 @@ pip install nonebot-plugin-maimaimonitor
 - 起飞（异常）：「华立冯飞了」「SEGA老冯起飞」
 - 返航（正常）：「华立冯返航了」「SEGA老冯落地」
 
-### 断网播报
+### 断网播报 (无需私钥)
 配置 `MAIMAI_BROADCAST_GROUP_IDS` 或开启 `MAIMAI_BROADCAST_ALL_GROUPS` 后，服务器出现异常时自动推送：
 
 ```
