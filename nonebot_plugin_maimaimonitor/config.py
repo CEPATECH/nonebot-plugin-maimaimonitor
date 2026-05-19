@@ -9,3 +9,4 @@ class Config(BaseModel):
     maimai_broadcast_group_ids: list[int] = []
     maimai_broadcast_interval: int = 300
     maimai_broadcast_all_groups: bool = False
+    maimai_broadcast_time_ranges: Optional[str] = None

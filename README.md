@@ -47,6 +47,7 @@ pip install nonebot-plugin-maimaimonitor
 | `MAIMAI_BROADCAST_GROUP_IDS` | `list[int]` | `[]` | 广播推送的群组列表 |
 | `MAIMAI_BROADCAST_INTERVAL` | `int` | `300` | 广播轮询检测间隔（秒）|
 | `MAIMAI_BROADCAST_ALL_GROUPS` | `bool` | `false` | 向bot所在所有群播报，谨慎使用 |
+| `MAIMAI_BROADCAST_TIME_RANGES` | `str` | 无 | 推送时间白名单，格式如 `8-11,13-20`，空时不限制。左闭右开（`8-11` 包含 8 点不包含 11 点），跨天用 `22-6`（晚上 10 点到早上 6 点）|
 
 > **申请 Client ID**：Client ID 由您自行提供，任意 ASCII 字符串，联系 qwq@chongxi.us 或 chongxi3555@proton.me 获取对应私钥。
 

@@ -1,5 +1,6 @@
 from asyncio import Lock
 from collections import defaultdict
+from datetime import datetime, timezone, timedelta
 from nonebot import on_command, on_message, require, get_plugin_config
 from nonebot.log import logger
 from nonebot.rule import Rule
@@ -7,7 +8,7 @@ from nonebot.matcher import Matcher
 from nonebot.adapters.onebot.v11 import Bot, Event, Message, GroupMessageEvent
 from nonebot.params import CommandArg
 import time
-from typing import Any
+from typing import Any, Optional
 from .config import Config
 from .constants import (
     get_help_menu, REPORT_MAPPING, ReportCode, 
@@ -121,9 +122,52 @@ async def broadcast_to_groups(msg: str):
     except Exception as e:
         logger.warning(f"获取bot实例失败: {e}")
 
+def _parse_time_ranges(raw: Optional[str]) -> list[tuple[int, int]]:
+    if not raw:
+        return []
+    ranges = []
+    for part in raw.split(","):
+        part = part.strip()
+        if "-" not in part:
+            continue
+        parts = part.split("-", 1)
+        try:
+            start = int(parts[0].strip())
+            end = int(parts[1].strip())
+            ranges.append((start, end))
+        except ValueError:
+            continue
+    return ranges
+
+def _is_in_broadcast_window() -> bool:
+    raw = config.maimai_broadcast_time_ranges
+    if not raw:
+        return True
+    cst = timezone(timedelta(hours=8))
+    now_hour = datetime.now(cst).hour
+    parsed = _parse_time_ranges(raw)
+    valid = []
+    for start, end in parsed:
+        if start == end:
+            logger.warning(f"忽略无效时间区间 {start}-{end}，起止小时相同")
+            continue
+        valid.append((start, end))
+    if not valid:
+        return True
+    for start, end in valid:
+        if start <= end:
+            if start <= now_hour < end:
+                return True
+        else:
+            if now_hour >= start or now_hour < end:
+                return True
+    return False
+
 async def check_server_status():
     global last_status, anomaly_start_time
     if not config.maimai_broadcast_group_ids and not config.maimai_broadcast_all_groups:
+        return
+    if not _is_in_broadcast_window():
         return
     try:
         data = await reporter.fetch_status()
