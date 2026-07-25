@@ -297,8 +297,6 @@ async def handle_report(bot: Bot, event: Event, args: Message = CommandArg()):
         report_code=report_code,
         report_name=report_name,
         report_value=report_value,
-        bot=bot,
-        event=event
     )
     await report_matcher.finish(result_message)
 
@@ -307,8 +305,6 @@ async def process_maimai_report(
     report_code: ReportCode,
     report_name: str,
     report_value: Any,
-    bot: Bot,
-    event: Event
 ) -> str:
     async with cache_lock:
         report_cache[report_code].append(report_value)
@@ -370,11 +366,11 @@ async def send_aggregated_reports():
 
     try:
         await reporter.send_report(final_payload, config.maimai_bot_display_name)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"上报聚合数据失败: {e}")
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler
 
-scheduler.add_job(send_aggregated_reports, "interval", seconds=30, id="maimai_report_scheduler_v11")
-scheduler.add_job(check_server_status, "interval", seconds=config.maimai_broadcast_interval, id="maimai_broadcast_checker")
+scheduler.add_job(send_aggregated_reports, "interval", seconds=30, id="maimai_report_scheduler_v11", replace_existing=True)
+scheduler.add_job(check_server_status, "interval", seconds=config.maimai_broadcast_interval, id="maimai_broadcast_checker", replace_existing=True)

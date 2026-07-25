@@ -129,15 +129,7 @@ pip install nonebot-plugin-maimaimonitor
 
 ## 通用 API 文档
 
-<div align="center">
-  <img src="https://img.shields.io/badge/nextra-000000?style=for-the-badge&logo=nextra&logoColor=white" />
-    <img src="https://img.shields.io/badge/vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" />
-
-</div>
-
-<br>
-
-完整接口说明及在线调试工具请访问 [isMaiDown API Docs](https://maidoc.chongxi.us)
+完整接口说明及在线调试工具请访问 [isMaiDown API Docs](https://mai.chongxi.us/docs)
 
 ---
 

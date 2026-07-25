@@ -58,75 +58,70 @@ STANDALONE_ANOMALY = ['灰网', '炸网', '被发票', '发票了', '扫号']
 
 STANDALONE_NORMAL = ['绿网了', '服务器好了', '恢复正常']
 
+def _has_negation(text: str, start: int, end: int) -> bool:
+    span = text[max(0, start - 5):end]
+    return any(w in span for w in NEGATIVE_WORDS)
+
 FENG_FLY_PATTERN = r'(?=.*(?:华立|[Ss][Ee][Gg][Aa]|[Ss][Bb][Gg][Aa]))(?=.*冯)(?=.*(?:飞|起飞))'
 FENG_RETURN_PATTERN = r'(?=.*(?:华立|[Ss][Ee][Gg][Aa]|[Ss][Bb][Gg][Aa]))(?=.*冯)(?=.*(?:返航|落地|稳了))'
 
 def detect_ban(text: str) -> bool:
-    def has_negation(pos: int) -> bool:
-        prefix = text[max(0, pos-5):pos]
-        return any(w in prefix for w in NEGATIVE_WORDS)
-    
     for word in STANDALONE_BAN:
         idx = text.find(word)
-        if idx != -1 and not has_negation(idx):
+        if idx != -1 and not _has_negation(text, idx, idx + len(word)):
             return True
-    
+
     if re.search(r'\d+\s*(min|分钟)了', text, re.IGNORECASE):
         return True
-    
+
     return False
 
 def detect_guest(text: str) -> bool:
-    def has_negation(pos: int) -> bool:
-        prefix = text[max(0, pos-5):pos]
-        return any(w in prefix for w in NEGATIVE_WORDS)
-    
     for word in STANDALONE_GUEST:
         idx = text.find(word)
-        if idx != -1 and not has_negation(idx):
+        if idx != -1 and not _has_negation(text, idx, idx + len(word)):
             return True
-    
+
     return False
 
 def detect_anomaly(text: str) -> bool:
-    def has_negation(pos: int) -> bool:
-        prefix = text[max(0, pos-5):pos]
-        return any(w in prefix for w in NEGATIVE_WORDS)
-    
     for word in STANDALONE_ANOMALY:
         idx = text.find(word)
-        if idx != -1 and not has_negation(idx):
+        if idx != -1 and not _has_negation(text, idx, idx + len(word)):
             return True
-    
+
     pattern = re.compile(
         rf'{OPERATOR_PATTERN}.{{0,10}}{ANOMALY_VERB_PATTERN}',
         re.IGNORECASE
     )
     for m in pattern.finditer(text):
-        if not has_negation(m.start()):
+        if not _has_negation(text, m.start(), m.end()):
             return True
-    
+
     return False
 
 def detect_normal(text: str) -> bool:
     if any(w in text for w in UNCERTAIN_WORDS):
         return False
-    
+
     for word in STANDALONE_NORMAL:
         if word in text:
-            return True
-    
+            idx = text.find(word)
+            if not _has_negation(text, idx, idx + len(word)):
+                return True
+
     pattern = re.compile(
         rf'{OPERATOR_PATTERN}.{{0,10}}{NORMAL_VERB_PATTERN}',
         re.IGNORECASE
     )
-    return bool(pattern.search(text))
+    for m in pattern.finditer(text):
+        if not _has_negation(text, m.start(), m.end()):
+            return True
+
+    return False
 
 def detect_feng(text: str) -> int:
-    def has_negation_global(t: str) -> bool:
-        return any(w in t for w in NEGATIVE_WORDS)
-    
-    if has_negation_global(text):
+    if _has_negation(text, 0, len(text)):
         return 0
     if re.search(FENG_RETURN_PATTERN, text, re.IGNORECASE):
         return -1
