@@ -19,7 +19,7 @@
 - **手动上报**：通过 `/report` 命令上报故障类型
 - **自动监听**：在群聊中自动识别玩家自然语言，无需手动触发命令
 - **冯氏指数**：自动识别「老冯起飞/返航」
-- **断网播报**：服务器状态变化时，自动推送告警和恢复通知到配置的群
+- **断网播报**：服务器宕机时自动推送告警（含宕机服务清单），恢复后推送通知到配置的群
 - **广播公告**：服务端推送公告时，`/net` 自动显示
 
 ## 安装
@@ -58,9 +58,16 @@ pip install nonebot-plugin-maimaimonitor
 
 ```
 【舞萌DX游戏服务器状态】
-游戏服务器 ✅ 好
-⏱ 当前延迟：396ms｜服务器负载：空闲｜延迟中波动
+🟢 一切正常
 
+【服务状态】
+🟢 NET      42ms
+🟢 会员      38ms
+🟢 标题      45ms
+🟢 公众号    51ms
+🟢 配信      40ms
+
+⏱ 当前延迟：42ms｜服务器负载：流畅｜延迟稳定
 💬 服务器运行正常
 • 1小时前 中国 机台断网
 • 4小时前 JP 机台无法登录
@@ -93,11 +100,13 @@ pip install nonebot-plugin-maimaimonitor
 - 返航（正常）：「华立冯返航了」「SEGA老冯落地」
 
 ### 断网播报 (无需私钥)
-配置 `MAIMAI_BROADCAST_GROUP_IDS` 或开启 `MAIMAI_BROADCAST_ALL_GROUPS` 后，服务器出现异常时自动推送：
+配置 `MAIMAI_BROADCAST_GROUP_IDS` 或开启 `MAIMAI_BROADCAST_ALL_GROUPS` 后，服务器宕机时自动推送：
 
 ```
 【舞萌DX服务器断网播报】
-游戏服务器 ❌ 坏
+🔴 部分服务宕机
+
+宕机服务：NET、标题
 
 💬 过去1小时有5条异常上报，延迟934ms
 • 刚刚 BOT 机台断网
@@ -110,7 +119,7 @@ pip install nonebot-plugin-maimaimonitor
 
 ```
 【舞萌DX服务器状态恢复】
-游戏服务器 ✅ 好
+🟢 一切正常
 本次约持续 1hr 23min
 
 🔗 详情请查看 https://mai.chongxi.us/

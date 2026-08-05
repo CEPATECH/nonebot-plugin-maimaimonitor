@@ -23,6 +23,56 @@ KEYWORD_COOLDOWN_SECONDS = 60
 last_status: str = "normal"
 anomaly_start_time: float | None = None
 
+VERDICT_MAP = {
+    "normal": "🟢 一切正常",
+    "recovering": "🟡 部分服务性能恢复",
+    "degraded": "🟠 部分服务性能下降",
+    "outage": "🔴 部分服务宕机",
+    "maintenance": "🔧 服务器维护中",
+    "nodata": "⚪ 无数据",
+}
+
+STATE_MAP = {
+    "ok": "🟢",
+    "down": "🔴",
+    "degraded": "🟠",
+    "recovering": "🟡",
+    "maintenance": "🔧",
+    "nodata": "⚪",
+}
+
+BAD_VERDICTS = {"outage"}
+SKIP_VERDICTS = {"maintenance"}
+
+LEGACY_STATUS_TO_VERDICT = {
+    "normal": "normal",
+    "anomaly": "degraded",
+    "empty": "outage",
+    "maintenance": "maintenance",
+}
+
+
+def _resolve_verdict(data: dict) -> str:
+    verdict = data.get("verdict")
+    if verdict in VERDICT_MAP:
+        return verdict
+    return LEGACY_STATUS_TO_VERDICT.get(data.get("status", "normal"), "normal")
+
+
+def _render_services(services) -> list[str]:
+    lines = ["【服务状态】"]
+    for s in services or []:
+        name = s.get("name", "?")
+        state = s.get("state", "nodata")
+        latency = s.get("latency")
+        lat_str = f"{latency}ms" if latency is not None else "--"
+        line = f"{STATE_MAP.get(state, '⚪')} {name}  {lat_str}"
+        dur = s.get("duration_text") or ""
+        if dur:
+            line += f"（{dur}）"
+        lines.append(line)
+    return lines
+
 from .client import MaimaiReporter
 
 reporter = MaimaiReporter(
@@ -53,18 +103,20 @@ async def handle_net(matcher: Matcher):
             "获取服务器状态失败，请稍后重试\n🔗 https://mai.chongxi.us"
         )
         return
-    
-    status = data.get("status", "empty")
-    status_map = {"normal": "✅ 好", "anomaly": "⚠️ 不稳定", "empty": "❌ 坏"}
-    status_label = status_map.get(status, "❓ 未知")
-    
+
+    verdict = _resolve_verdict(data)
     latency = data.get("latency", {})
     reports = data.get("reports", {})
     logs = data.get("recent_logs", [])
     broadcast = data.get("broadcast")
-    
-    msg = f"【舞萌DX游戏服务器状态】\n"
-    msg += f"游戏服务器 {status_label}\n"
+
+    msg = "【舞萌DX游戏服务器状态】\n"
+    msg += f"{VERDICT_MAP.get(verdict, '❓ 未知')}\n\n"
+
+    services = data.get("services")
+    if services:
+        msg += "\n".join(_render_services(services)) + "\n\n"
+
     msg += f"⏱ 当前延迟：{latency.get('current_ms', '--')}ms｜"
     msg += f"服务器负载：{latency.get('load_text', '--')}｜"
     msg += f"延迟{latency.get('volatility_text', '--')}\n\n"
@@ -72,23 +124,23 @@ async def handle_net(matcher: Matcher):
     anomaly = reports.get('anomaly_count', 0)
     normal = reports.get('normal_count', 0)
     if anomaly == 0 and normal == 0:
-        msg += f"💬 过去1小时内无任何上报\n"
+        msg += "💬 过去1小时内无任何上报\n"
     elif normal == 0:
         msg += f"💬 过去1小时有{anomaly}条异常上报，无正常上报\n"
     elif anomaly == 0:
         msg += f"💬 过去1小时有{normal}条正常上报，无异常\n"
     else:
         msg += f"💬 过去1小时有{anomaly}条异常，{normal}条正常上报\n"
-    
+
     if logs:
         for log in logs[:3]:
             msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
-    
+
     if broadcast and broadcast.get("msg"):
         msg += f"\n📢 {broadcast['msg']}\n"
-    
-    msg += f"\n🔗 详情请查看 https://mai.chongxi.us/"
-    
+
+    msg += "\n🔗 详情请查看 https://mai.chongxi.us/"
+
     await matcher.finish(msg)
 
 def format_duration(seconds: int) -> str:
@@ -173,36 +225,43 @@ async def check_server_status():
         data = await reporter.fetch_status()
         if not data:
             return
-        status = data.get("status", "normal")
+        cur = _resolve_verdict(data)
         now = time.time()
 
-        if last_status == "normal" and status in ("anomaly", "empty"):
+        if cur in SKIP_VERDICTS:
+            last_status = cur
+            return
+
+        if last_status not in BAD_VERDICTS and cur in BAD_VERDICTS:
             anomaly_start_time = now
-            last_status = status
+            last_status = cur
             summary = data.get("summary", "")
             logs = data.get("recent_logs", [])
+            down_names = [s.get("name", "?") for s in (data.get("services") or []) if s.get("state") == "down"]
             msg = "【舞萌DX服务器断网播报】\n"
-            msg += "游戏服务器 ❌ 坏\n\n"
-            msg += f"💬 {summary}\n"
+            msg += f"{VERDICT_MAP.get(cur, '❓ 未知')}\n"
+            if down_names:
+                msg += f"\n宕机服务：{'、'.join(down_names)}\n"
+            msg += f"\n💬 {summary}\n"
             for log in logs[:3]:
                 msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
             msg += "\n🔗 详情请查看 https://mai.chongxi.us/"
-            logger.info(f"检测到服务器异常，开始播报")
+            logger.info(f"检测到服务器宕机，开始播报")
             await broadcast_to_groups(msg)
 
-        elif last_status in ("anomaly", "empty") and status == "normal":
+        elif last_status in BAD_VERDICTS and cur not in BAD_VERDICTS:
             duration = int(now - anomaly_start_time) if anomaly_start_time else 0
-            last_status = "normal"
+            last_status = cur
             anomaly_start_time = None
             msg = "【舞萌DX服务器状态恢复】\n"
-            msg += "游戏服务器 ✅ 好\n"
+            msg += f"{VERDICT_MAP.get(cur, '❓ 未知')}\n"
             msg += f"本次约持续 {format_duration(duration)}\n\n"
             msg += "🔗 详情请查看 https://mai.chongxi.us/"
             logger.info(f"服务器恢复正常，播报恢复通知")
             await broadcast_to_groups(msg)
 
         else:
-            last_status = status
+            last_status = cur
 
     except Exception as e:
         logger.warning(f"状态检测失败: {e}")
