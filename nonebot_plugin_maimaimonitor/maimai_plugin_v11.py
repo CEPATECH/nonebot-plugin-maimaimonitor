@@ -59,23 +59,17 @@ def _resolve_verdict(data: dict) -> str:
     return LEGACY_STATUS_TO_VERDICT.get(data.get("status", "normal"), "normal")
 
 
-def _is_delivery(s: dict) -> bool:
-    key = str(s.get("key", "")).lower()
-    name = str(s.get("name", "")).lower()
-    return key == "haisin" or (not key and name == "配信")
-
-
 def _broadcast_eligible(services) -> list[dict]:
     cfg = {str(x).lower() for x in config.maimai_broadcast_servers}
-    if cfg:
-        out = []
-        for s in services or []:
-            candidates = {str(s.get("key", "")).lower(), str(s.get("name", "")).lower()}
-            candidates.discard("")
-            if candidates & cfg:
-                out.append(s)
-        return out
-    return [s for s in services or [] if not _is_delivery(s)]
+    if not cfg:
+        return list(services or [])
+    out = []
+    for s in services or []:
+        candidates = {str(s.get("key", "")).lower(), str(s.get("name", "")).lower()}
+        candidates.discard("")
+        if candidates & cfg:
+            out.append(s)
+    return out
 
 
 def _render_services(services) -> list[str]:
