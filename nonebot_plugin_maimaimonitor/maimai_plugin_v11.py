@@ -22,6 +22,7 @@ KEYWORD_COOLDOWN_SECONDS = 60
 
 last_status: str = "normal"
 anomaly_start_time: float | None = None
+outage_active: bool = False
 
 VERDICT_MAP = {
     "normal": "🟢 一切正常",
@@ -41,7 +42,6 @@ STATE_MAP = {
     "nodata": "⚪",
 }
 
-BAD_VERDICTS = {"outage"}
 SKIP_VERDICTS = {"maintenance"}
 
 LEGACY_STATUS_TO_VERDICT = {
@@ -57,6 +57,25 @@ def _resolve_verdict(data: dict) -> str:
     if verdict in VERDICT_MAP:
         return verdict
     return LEGACY_STATUS_TO_VERDICT.get(data.get("status", "normal"), "normal")
+
+
+def _is_delivery(s: dict) -> bool:
+    key = str(s.get("key", "")).lower()
+    name = str(s.get("name", "")).lower()
+    return key == "haisin" or (not key and name == "配信")
+
+
+def _broadcast_eligible(services) -> list[dict]:
+    cfg = {str(x).lower() for x in config.maimai_broadcast_servers}
+    if cfg:
+        out = []
+        for s in services or []:
+            candidates = {str(s.get("key", "")).lower(), str(s.get("name", "")).lower()}
+            candidates.discard("")
+            if candidates & cfg:
+                out.append(s)
+        return out
+    return [s for s in services or [] if not _is_delivery(s)]
 
 
 def _render_services(services) -> list[str]:
@@ -216,7 +235,7 @@ def _is_in_broadcast_window() -> bool:
     return False
 
 async def check_server_status():
-    global last_status, anomaly_start_time
+    global last_status, anomaly_start_time, outage_active
     if not config.maimai_broadcast_group_ids and not config.maimai_broadcast_all_groups:
         return
     if not _is_in_broadcast_window():
@@ -230,26 +249,18 @@ async def check_server_status():
 
         if cur in SKIP_VERDICTS:
             last_status = cur
+            outage_active = False
             return
 
-        if last_status not in BAD_VERDICTS and cur in BAD_VERDICTS:
-            anomaly_start_time = now
-            last_status = cur
-            summary = data.get("summary", "")
-            logs = data.get("recent_logs", [])
-            down_names = [s.get("name", "?") for s in (data.get("services") or []) if s.get("state") == "down"]
-            msg = "【舞萌DX服务器断网播报】\n"
-            msg += f"{VERDICT_MAP.get(cur, '❓ 未知')}\n"
-            if down_names:
-                msg += f"\n宕机服务：{'、'.join(down_names)}\n"
-            msg += f"\n💬 {summary}\n"
-            for log in logs[:3]:
-                msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
-            msg += "\n🔗 详情请查看 https://mai.chongxi.us/"
-            logger.info(f"检测到服务器宕机，开始播报")
-            await broadcast_to_groups(msg)
+        services = data.get("services")
+        eligible = _broadcast_eligible(services)
+        down_names = [s.get("name", "?") for s in eligible if s.get("state") == "down"]
 
-        elif last_status in BAD_VERDICTS and cur not in BAD_VERDICTS:
+        if outage_active:
+            if down_names:
+                last_status = cur
+                return
+            outage_active = False
             duration = int(now - anomaly_start_time) if anomaly_start_time else 0
             last_status = cur
             anomaly_start_time = None
@@ -259,9 +270,27 @@ async def check_server_status():
             msg += "🔗 详情请查看 https://mai.chongxi.us/"
             logger.info(f"服务器恢复正常，播报恢复通知")
             await broadcast_to_groups(msg)
+            return
 
-        else:
+        if not down_names:
             last_status = cur
+            return
+
+        outage_active = True
+        anomaly_start_time = now
+        last_status = cur
+        summary = data.get("summary", "")
+        logs = data.get("recent_logs", [])
+        msg = "【舞萌DX服务器断网播报】\n"
+        msg += f"{VERDICT_MAP.get(cur, '❓ 未知')}\n"
+        if down_names:
+            msg += f"\n宕机服务：{'、'.join(down_names)}\n"
+        msg += f"\n💬 {summary}\n"
+        for log in logs[:3]:
+            msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
+        msg += "\n🔗 详情请查看 https://mai.chongxi.us/"
+        logger.info(f"检测到服务器宕机，开始播报")
+        await broadcast_to_groups(msg)
 
     except Exception as e:
         logger.warning(f"状态检测失败: {e}")
