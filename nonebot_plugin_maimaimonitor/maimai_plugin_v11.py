@@ -113,7 +113,7 @@ async def handle_net(matcher: Matcher):
     data = await reporter.fetch_status()
     if not data:
         await matcher.finish(
-            "获取服务器状态失败，请稍后重试\n🔗 https://mai.chongxi.us"
+            "获取服务器状态失败，请稍后重试\n📡 数据来源：华立服务器死了吗 by Chongxi"
         )
         return
 
@@ -152,7 +152,7 @@ async def handle_net(matcher: Matcher):
     if broadcast and broadcast.get("msg"):
         msg += f"\n📢 {broadcast['msg']}\n"
 
-    msg += "\n🔗 详情请查看 https://mai.chongxi.us/"
+    msg += "\n📡 数据来源：华立服务器死了吗 by Chongxi"
 
     await matcher.finish(msg)
 
@@ -261,7 +261,7 @@ async def check_server_status():
             msg = "【舞萌DX服务器状态恢复】\n"
             msg += f"{VERDICT_MAP.get(cur, '❓ 未知')}\n"
             msg += f"本次约持续 {format_duration(duration)}\n\n"
-            msg += "🔗 详情请查看 https://mai.chongxi.us/"
+            msg += "\n📡 数据来源：华立服务器死了吗 by Chongxi"
             logger.info(f"服务器恢复正常，播报恢复通知")
             await broadcast_to_groups(msg)
             return
@@ -282,7 +282,7 @@ async def check_server_status():
         msg += f"\n💬 {summary}\n"
         for log in logs[:3]:
             msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
-        msg += "\n🔗 详情请查看 https://mai.chongxi.us/"
+        msg += "\n📡 数据来源：华立服务器死了吗 by Chongxi"
         logger.info(f"检测到服务器宕机，开始播报")
         await broadcast_to_groups(msg)
 
