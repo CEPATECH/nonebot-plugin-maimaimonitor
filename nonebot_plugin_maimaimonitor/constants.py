@@ -42,7 +42,7 @@ REPORT_MAPPING = {
 
 OPERATOR_PATTERN = r'(?:华立|[Ss][Ee][Gg][Aa]|[Ss][Bb][Gg][Aa]|冯|老冯|服务器|机台|[Nn][Ee][Tt]|会员|标题|游戏)'
 
-ANOMALY_VERB_PATTERN = r'(?:炸|挂|死|坏|灰|飞|崩|寄|凉|废|完|烂|蹦|卡死|不行)'
+ANOMALY_VERB_PATTERN = r'(?:炸|挂|死|坏|灰|飞|崩|寄|凉|废|完|烂|蹦|卡死|不行|掉线|断联)'
 
 NORMAL_VERB_PATTERN = r'(?:好了|稳了|正常了|恢复了|回来了|活了|绿了|通了|好使了|没事了)'
 
@@ -85,6 +85,9 @@ def detect_guest(text: str) -> bool:
     return False
 
 def detect_anomaly(text: str) -> bool:
+    if any(w in text for w in UNCERTAIN_WORDS):
+        return False
+
     for word in STANDALONE_ANOMALY:
         idx = text.find(word)
         if idx != -1 and not _has_negation(text, idx, idx + len(word)):
