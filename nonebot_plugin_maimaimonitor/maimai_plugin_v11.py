@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from nonebot import on_command, on_message, require, get_plugin_config
 from nonebot.log import logger
 from nonebot.rule import Rule
+from nonebot.permission import SUPERUSER
 from nonebot.matcher import Matcher
 from nonebot.adapters.onebot.v11 import Bot, Event, Message, GroupMessageEvent
 from nonebot.params import CommandArg
@@ -16,6 +17,9 @@ from .constants import (
 )
 
 config = get_plugin_config(Config)
+
+broadcast_group_ids: set[int] = set()
+broadcast_blacklist_ids: set[int] = set()
 
 keyword_cooldown: dict[int, float] = {}
 KEYWORD_COOLDOWN_SECONDS = 60
@@ -99,6 +103,60 @@ cache_lock = Lock()
 
 report_matcher = on_command("report", aliases={"上报"}, priority=5, block=False)
 net_matcher = on_command("net", priority=5, block=False)
+broadcast_matcher = on_command("广播", aliases={"断网推送", "推送"}, priority=5, block=True, permission=SUPERUSER)
+
+
+@broadcast_matcher.handle()
+async def handle_broadcast(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
+    arg_text = args.extract_plain_text().strip()
+    group_id = event.group_id
+
+    if not arg_text:
+        await broadcast_matcher.finish(_broadcast_usage())
+
+    action = arg_text.split()[0].lower()
+
+    if action in ("开", "on", "启用", "开启"):
+        broadcast_blacklist_ids.discard(group_id)
+        broadcast_group_ids.add(group_id)
+        await broadcast_matcher.finish(
+            f"✅ 已对本群开启断网推送（群 {group_id}）\n"
+            "服务器宕机/恢复时 bot 会自动播报。\n"
+            f"可用 /广播 关 关闭当前群推送"
+        )
+
+    if action in ("关", "off", "关闭", "停用"):
+        broadcast_group_ids.discard(group_id)
+        broadcast_blacklist_ids.add(group_id)
+        await broadcast_matcher.finish(
+            f"⛔ 已强制关闭当前群（{group_id}）的断网推送\n"
+            "即使 env 配置了该群也不会播报；/广播 开 可重新开启"
+        )
+
+    if action in ("状态", "status", "查看", "list"):
+        lines = []
+        if broadcast_group_ids:
+            lines.append("命令启用的群：" + "、".join(str(g) for g in sorted(broadcast_group_ids)))
+        if broadcast_blacklist_ids:
+            lines.append("已强制关闭（黑名单）：" + "、".join(str(g) for g in sorted(broadcast_blacklist_ids)))
+        if config.maimai_broadcast_group_ids:
+            lines.append("env 配置（兜底，仍会播报）：" + "、".join(str(g) for g in config.maimai_broadcast_group_ids))
+        if config.maimai_broadcast_all_groups:
+            lines.append("env：向所有群播报")
+        if not lines:
+            await broadcast_matcher.finish("当前没有任何断网推送配置")
+        await broadcast_matcher.finish("\n".join(lines))
+
+    await broadcast_matcher.finish(_broadcast_usage())
+
+
+def _broadcast_usage() -> str:
+    return (
+        "断网推送管理（仅管理员）\n"
+        "/广播 开 —— 对当前群开启断网推送\n"
+        "/广播 关 —— 强制关闭当前群断网推送（优先级高于 env 配置）\n"
+        "/广播 状态 —— 查看断网推送配置"
+    )
 
 DIRECT_ALIASES = {"网咋样", "华立服务器死了吗", "炸了吗"}
 
@@ -167,23 +225,20 @@ async def broadcast_to_groups(msg: str):
     try:
         from nonebot import get_bot
         bot = get_bot()
+        targets: set[int] = set(broadcast_group_ids)
         if config.maimai_broadcast_all_groups:
-            group_list = await bot.get_group_list()
-            for group in group_list:
-                try:
-                    await bot.send_group_msg(group_id=group['group_id'], message=msg)
-                    logger.info(f"播报成功 group_id={group['group_id']}")
-                except Exception as e:
-                    logger.warning(f"播报失败 group_id={group['group_id']}: {e}")
-        elif config.maimai_broadcast_group_ids:
-            for group_id in config.maimai_broadcast_group_ids:
-                try:
-                    await bot.send_group_msg(group_id=group_id, message=msg)
-                    logger.info(f"播报成功 group_id={group_id}")
-                except Exception as e:
-                    logger.warning(f"播报失败 group_id={group_id}: {e}")
-        else:
+            targets |= {g['group_id'] for g in (await bot.get_group_list())}
+        if config.maimai_broadcast_group_ids:
+            targets |= {int(x) for x in config.maimai_broadcast_group_ids}
+        targets -= broadcast_blacklist_ids
+        if not targets:
             return
+        for group_id in targets:
+            try:
+                await bot.send_group_msg(group_id=group_id, message=msg)
+                logger.info(f"播报成功 group_id={group_id}")
+            except Exception as e:
+                logger.warning(f"播报失败 group_id={group_id}: {e}")
     except Exception as e:
         logger.warning(f"获取bot实例失败: {e}")
 
@@ -230,7 +285,7 @@ def _is_in_broadcast_window() -> bool:
 
 async def check_server_status():
     global last_status, anomaly_start_time, outage_active
-    if not config.maimai_broadcast_group_ids and not config.maimai_broadcast_all_groups:
+    if not broadcast_group_ids and not config.maimai_broadcast_group_ids and not config.maimai_broadcast_all_groups:
         return
     if not _is_in_broadcast_window():
         return
