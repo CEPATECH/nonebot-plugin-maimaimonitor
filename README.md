@@ -44,7 +44,7 @@ pip install nonebot-plugin-maimaimonitor
 | `MAIMAI_BOT_PRIVATE_KEY` | `str` | 无 | 与 ClientID 配套的私钥，申请时一并提供 |
 | `MAIMAI_BOT_DISPLAY_NAME` | `str` | `qwq` | Bot显示名称，上报时展示 |
 | `MAIMAI_WORKER_URL` | `str` | `https://maiapi.chongxi.us` | 上报API地址 |
-| `MAIMAI_BROADCAST_GROUP_IDS` | `list[int]` | `[]` | 广播推送的群组列表（兜底，配了即始终推送，无需管理员命令） |
+| `MAIMAI_BROADCAST_GROUP_IDS` | `list[int]` | `[]` | 广播推送的群组列表 |
 | `MAIMAI_BROADCAST_INTERVAL` | `int` | `300` | 广播轮询检测间隔（秒）|
 | `MAIMAI_BROADCAST_ALL_GROUPS` | `bool` | `false` | 向bot所在所有群播报，谨慎使用 |
 | `MAIMAI_BROADCAST_TIME_RANGES` | `str` | 无 | 推送时间白名单，格式如 `8-11,13-20`，空时不限制。左闭右开（`8-11` 包含 8 点不包含 11 点），跨天用 `22-6`（晚上 10 点到早上 6 点）|
@@ -100,24 +100,6 @@ pip install nonebot-plugin-maimaimonitor
 - 返航（正常）：「华立冯返航了」「SEGA老冯落地」
 
 ### 断网播报 (无需私钥)
-
-推荐用管理员命令，直接在群里动态开/关（无需改配置重启）：
-
-- `/广播 开` —— 对当前群开启断网推送
-- `/广播 关` —— 强制关闭当前群断网推送（**优先级高于 env 配置**）
-- `/广播 状态` —— 查看断网推送配置
-- 仅 **SUPERUSER（bot 配置的管理员）** 可用
-
-> 管理员命令针对「触发该命令的群」生效、每群独立。env 配置（下面的 `MAIMAI_BROADCAST_*`）会作为**兜底**，与命令启用的群合并播报：兜底群无需管理员在群里手动开启，凡配置的群始终接收推送。
->
-> **优先级（高 → 低）**：`/广播 关` 黑名单 > 命令「开」+ env 白名单 > `MAIMAI_BROADCAST_ALL_GROUPS` 全员。
->
-> - env 配了某群、但管理员 `/广播 关` 了它 → 该群**不会**播报（黑名单压制 env）
-> - 即使 `MAIMAI_BROADCAST_ALL_GROUPS=true`，被 `/广播 关` 的群也会被排除
-> - `/广播 开` 会解除该群的黑名单状态
->
-> **注意**：命令设置保存在内存中，bot 重启后会清空。要长期生效请配合 env 兜底配置，或重启后重新 `/广播 开`。
-
 配置 `MAIMAI_BROADCAST_GROUP_IDS` 或开启 `MAIMAI_BROADCAST_ALL_GROUPS` 后，服务器宕机时自动推送（默认全部服务的宕机都会播报，可用 `MAIMAI_BROADCAST_SERVERS` 限定播报范围）：
 
 ```
