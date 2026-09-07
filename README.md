@@ -48,7 +48,7 @@ pip install nonebot-plugin-maimaimonitor
 | `MAIMAI_BROADCAST_INTERVAL` | `int` | `300` | 广播轮询检测间隔（秒）|
 | `MAIMAI_BROADCAST_ALL_GROUPS` | `bool` | `false` | 向bot所在所有群播报，谨慎使用 |
 | `MAIMAI_BROADCAST_TIME_RANGES` | `str` | 无 | 推送时间白名单，格式如 `8-11,13-20`，空时不限制。左闭右开（`8-11` 包含 8 点不包含 11 点），跨天用 `22-6`（晚上 10 点到早上 6 点）|
-| `MAIMAI_BROADCAST_SERVERS` | `list[str]` | `[]` | 要播报的服务器列表，可填 key 或名字（如 `["net","aime"]`）。留空默认全部服务（NET/会员/标题/公众号(NET)/公众号(二维码)）都播报宕机提示 |
+| `MAIMAI_BROADCAST_SERVERS` | `list[str]` | `[]` | 要播报的服务器列表，可填 key 或名字（如 `["net","aime"]`）。留空默认全部服务（NET/会员/标题/公众号(NET)/公众号(二维码)/计费）都播报宕机提示 |
 
 > **申请 Client ID**：Client ID 由您自行提供，任意 ASCII 字符串，联系 qwq@chongxi.us 或 chongxi3555@proton.me 获取对应私钥。
 
@@ -67,6 +67,7 @@ pip install nonebot-plugin-maimaimonitor
 🟢 标题      45ms
 🟢 公众号(NET)  51ms
 🟢 公众号(二维码) 60ms
+🟢 计费  62ms
 
 ⏱ 当前延迟：42ms｜服务器负载：流畅｜延迟稳定
 💬 服务器运行正常
