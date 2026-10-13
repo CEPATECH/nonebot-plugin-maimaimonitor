@@ -120,7 +120,6 @@ async def handle_net(matcher: Matcher):
     verdict = _resolve_verdict(data)
     latency = data.get("latency", {})
     reports = data.get("reports", {})
-    logs = data.get("recent_logs", [])
     broadcast = data.get("broadcast")
 
     msg = "【舞萌DX游戏服务器状态】\n"
@@ -144,10 +143,6 @@ async def handle_net(matcher: Matcher):
         msg += f"💬 过去1小时有{normal}条正常上报，无异常\n"
     else:
         msg += f"💬 过去1小时有{anomaly}条异常，{normal}条正常上报\n"
-
-    if logs:
-        for log in logs[:3]:
-            msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
 
     if broadcast and broadcast.get("msg"):
         msg += f"\n📢 {broadcast['msg']}\n"
@@ -274,14 +269,11 @@ async def check_server_status():
         anomaly_start_time = now
         last_status = cur
         summary = data.get("summary", "")
-        logs = data.get("recent_logs", [])
         msg = "【舞萌DX服务器断网播报】\n"
         msg += f"{VERDICT_MAP.get(cur, '❓ 未知')}\n"
         if down_names:
             msg += f"\n宕机服务：{'、'.join(down_names)}\n"
         msg += f"\n💬 {summary}\n"
-        for log in logs[:3]:
-            msg += f"• {log.get('time_ago', '--')} {log.get('region', '--')} {log.get('type', '--')}\n"
         msg += "\n📡 数据来源：华立服务器死了吗 by Chongxi"
         logger.info(f"检测到服务器宕机，开始播报")
         await broadcast_to_groups(msg)
